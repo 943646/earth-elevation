@@ -4,6 +4,7 @@
 
 - 在线访问：https://943646.github.io/earth-elevation/ （中文） · https://943646.github.io/earth-elevation/en.html （English）
 - 单文件离线版：[`earth-offline.html`](earth-offline.html)（中文）、[`earth-offline-en.html`](earth-offline-en.html)（English），下载后双击即可使用，无需网络
+- 位置链接：地址栏会记录当前视角与选点（如 `#view=27.9881,86.925,160&pin=27.9881,86.925`），中英文切换时保持位置，也可直接复制链接分享
 
 ## 文件结构
 
