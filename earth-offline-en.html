@@ -531,6 +531,13 @@ class OrbitControls extends EventDispatcher {
 
 		};
 
+		// 立即停止惯性/自动旋转残留的转动（定位跳转时使用）
+		this.stopMotion = function () {
+
+			sphericalDelta.set( 0, 0, 0 );
+
+		};
+
 		this.reset = function () {
 
 			scope.target.copy( scope.target0 );
@@ -2212,6 +2219,7 @@ async function main(){
 
   setProgress(100, IS_TOUCH ? 'Ready · fully offline · drag to rotate / pinch to zoom / tap to read / double-tap to pick' : 'Ready · fully offline · drag to rotate / scroll to zoom / hover to read');
   setTimeout(()=>document.getElementById('loader').classList.add('off'), 400);
+  applyHash();   // 链接带位置时（中英文切换、分享），恢复视角与选点
 }
 function fail(msg){ const t=document.getElementById('loadtxt'); if(!/^Error/.test(t.textContent)) t.textContent = 'Error: '+msg; }
 
@@ -2371,7 +2379,7 @@ function flyCam(lat, lon, dist, D){
   const startDir = camera.position.clone().normalize();
   const endDir = ll2v(lat,lon,1);
   const qb = new THREE.Quaternion().setFromUnitVectors(startDir,endDir);
-  controls.autoRotate=false; spinning=false;
+  controls.autoRotate=false; spinning=false; controls.stopMotion();
   document.getElementById('spinBtn').textContent='Auto-rotate';
   const dur=D||1100, t0=performance.now();
   (function anim(now){
@@ -2387,6 +2395,7 @@ function placeMarker(lat,lon){
   marker.position.copy(ll2v(lat,lon,surfR(lat,lon,1)));
   marker.lookAt(marker.position.clone().multiplyScalar(2));
   marker.visible=true;
+  scheduleHash();
 }
 function flyTo(lat, lon, distOverride){
   lat=Math.max(-90,Math.min(90,lat));
@@ -2403,7 +2412,7 @@ function setFocusLabel(name){
   focusName=name;
   labelGroup.children.forEach(sp=>sp.center.set(.5, sp.userData.name===name ? -.35 : .5));
 }
-function clearSelection(){ selected=null; marker.visible=false; infoEl.classList.remove('on'); highlightGroup.clear(); setFocusLabel(null); }
+function clearSelection(){ selected=null; marker.visible=false; infoEl.classList.remove('on'); highlightGroup.clear(); setFocusLabel(null); scheduleHash(); }
 function fmtM(v){ v=Math.round(v); return (v>0?'+':'')+v+' m'; }
 function showElev(el){
   const b=document.getElementById('iElev');
@@ -2519,6 +2528,38 @@ controls.addEventListener('start', ()=>{
   if(spinning){ spinning=false; controls.autoRotate=false;
     document.getElementById('spinBtn').textContent='Auto-rotate'; }
 });
+
+/* ── 位置写入链接：#view=纬度,经度,镜头距离&pin=纬度,经度
+   中英文切换时带上它，打开后回到同一视角与选点；地址栏链接也可直接分享 ── */
+function viewHash(){
+  const c=camera.position, d=c.length(), f=x=>+x.toFixed(4);
+  const lat=90-Math.acos(Math.max(-1,Math.min(1,c.y/d)))/DEG;
+  const lon=((Math.atan2(c.z,-c.x)/DEG-180)%360+540)%360-180;
+  return `#view=${f(lat)},${f(lon)},${+d.toFixed(1)}` + (selected ? `&pin=${f(selected.lat)},${f(selected.lon)}` : '');
+}
+let hashT=0;
+function scheduleHash(){
+  if(hashT || spinning) return;   // 自动旋转时不改地址栏
+  hashT=setTimeout(()=>{ hashT=0; try{ history.replaceState(null,'',viewHash()); }catch(e){} }, 600);
+}
+controls.addEventListener('change', scheduleHash);
+function applyHash(){
+  const q=new URLSearchParams(location.hash.slice(1)), num=k=>(q.get(k)||'').split(',').map(Number);
+  const v=num('view'), p=num('pin'), ok=(a,n)=>a.length===n && a.every(isFinite);
+  if(ok(v,3) && Math.abs(v[0])<=90){
+    spinning=false; controls.autoRotate=false; controls.stopMotion(); document.getElementById('spinBtn').textContent='Auto-rotate';
+    camera.position.copy(ll2v(v[0],v[1],Math.max(controls.minDistance,Math.min(controls.maxDistance,v[2]))));
+    camera.lookAt(0,0,0);
+  }
+  if(ok(p,2) && Math.abs(p[0])<=90){
+    const lat=p[0], lon=Math.round((((p[1]+180)%360+360)%360-180)*1e4)/1e4;
+    document.getElementById('lat').value=lat; document.getElementById('lon').value=lon;
+    selected={lat,lon}; placeMarker(lat,lon);
+    infoEl.classList.add('on'); updateInfo(lat,lon);
+  }
+}
+{ const a=document.querySelector('.brand .lang');   // 网页版的中英文切换链接
+  if(a) a.addEventListener('click', e=>{ e.preventDefault(); location.href=a.getAttribute('href')+viewHash(); }); }
 
 /* ── 离线搜索：国家或地区（Natural Earth 名称 + 中文名）与地标（内置参考值 + 快捷地点） ── */
 let SEARCH=[];
