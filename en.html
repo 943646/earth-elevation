@@ -954,7 +954,8 @@ function centroid(g){
 /* ── 定位标记 ── */
 const marker = new THREE.Group();
 const pin = new THREE.Mesh(new THREE.SphereGeometry(3.3,20,20),
-  new THREE.MeshBasicMaterial({color:0xff5a5a}));
+  new THREE.MeshBasicMaterial({color:0xff5a5a, depthTest:false, depthWrite:false}));   // 贴地绘制，不被地形遮挡；背面由朝向判断隐藏
+pin.renderOrder=12;
 marker.add(pin); marker.visible=false; scene.add(marker);
 const PIN_PX = IS_TOUCH ? 6 : 7.5;   // 红点在屏幕上的半径（像素）：手机 6，电脑 7.5
 
@@ -977,7 +978,7 @@ function flyCam(lat, lon, dist, D){
 }
 function placeMarker(lat,lon){
   marker.userData.ll=[lat,lon];
-  marker.position.copy(ll2v(lat,lon,surfR(lat,lon,1)));
+  marker.position.copy(ll2v(lat,lon,surfR(lat,lon,.02)));   // 贴着地表 / 海面
   marker.lookAt(marker.position.clone().multiplyScalar(2));
   marker.visible=true;
   scheduleHash();
@@ -1436,7 +1437,7 @@ document.getElementById('lyAtmo').onchange=e=>atmo.visible=e.target.checked;
 document.getElementById('dispSlider').oninput=e=>{
   uniforms.uDisp.value=+e.target.value;
   labelGroup.children.forEach(sp=>{ const [la,lo]=sp.userData.ll; sp.position.copy(ll2v(la,lo,surfR(la,lo,LABEL_GAP))); });
-  if(marker.userData.ll) placeMarker(...marker.userData.ll);
+  if(marker.visible && marker.userData.ll) placeMarker(...marker.userData.ll);
   document.getElementById('dispVal').textContent=(+e.target.value).toFixed(1)+'×';
 };
 
@@ -1570,7 +1571,7 @@ function animate(t){
     uniforms.uLight.value.set(-.45*m[0]+.55*m[4]+m[8], -.45*m[1]+.55*m[5]+m[9], -.45*m[2]+.55*m[6]+m[10]).normalize(); }
   const d=camera.position.length();
   /* 标注：背面隐藏、靠近边缘淡出；离得越近显示越多小国 */
-  const minArea=60*Math.pow(hCam/200,2)*Math.max(1,Math.pow(800/appH(),2)), cp=camera.position;   // 屏幕越小，显示的小国越少，减少重叠
+  const minArea=60*Math.pow(hCam/200,2)*Math.max(1,Math.pow(800/appH(),2))*Math.min(1,Math.pow(hCam/70,3)), cp=camera.position;   // 拉得很近时（离地 <70）逐步放宽，新加坡这类小国也能显示   // 屏幕越小，显示的小国越少，减少重叠
   labelGroup.children.forEach(sp=>{
     const p=sp.position, pl=p.length();
     const facing=(p.x*(cp.x-p.x)+p.y*(cp.y-p.y)+p.z*(cp.z-p.z))/(pl*cp.distanceTo(p));
@@ -1579,6 +1580,9 @@ function animate(t){
     const o = d>620 ? 0 : edge*size;
     sp.material.opacity=o; sp.visible=o>.01;
   });
+  if(marker.visible){   // 转到地球背面时隐藏红点
+    const p=marker.position; pin.visible=(p.x*(cp.x-p.x)+p.y*(cp.y-p.y)+p.z*(cp.z-p.z))>0;
+  }
   if(marker.visible) marker.scale.setScalar(   // 红点按屏幕像素保持固定大小（与屏幕高度无关）
     camera.position.distanceTo(marker.position)*2*Math.tan(camera.fov*DEG/2)*PIN_PX/appH()/3.3);
   renderer.render(scene,camera);
