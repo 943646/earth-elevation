@@ -93,7 +93,7 @@ PAIRS = [
      "'Invalid latitude: use -90 to 90, e.g. 30.57 or 30°34′12″N; do not combine a sign with N/S'"),
     ("'经度格式不对：应在 -180~180 度之间，如 104.07、104°4′12″E；正负号与 E/W 不能同时用'",
      "'Invalid longitude: use -180 to 180, e.g. 104.07 or 104°4′12″E; do not combine a sign with E/W'"),
-    ("`已定位 ${r.zh}，请在地图上选点查询海拔或海深`", "`Showing ${r.zh}. Pick a point on the map to read elevation or depth.`"),
+    ("`已定位 ${r.zh}，红点为其中心位置`", "`Showing ${r.zh}. The red dot marks its center.`"),
     ("${r.type==='region'?'国家或地区':'地标'}", "${r.type==='region'?'Country / region':'Landmark'}"),
     ("'未找到「'+q.replace(/[<>&\"]/g,'')+'」，目前只收录国家或地区及内置地标'",
      "'No match for “'+q.replace(/[<>&\"]/g,'')+'”. Only countries, regions and built-in landmarks are included.'"),
