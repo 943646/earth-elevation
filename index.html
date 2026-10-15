@@ -885,7 +885,7 @@ function makeLabels(){
     ctx.fillText(display, 8*s, 10.5*s);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({
       map:new THREE.CanvasTexture(cv), transparent:true, depthTest:false, sizeAttenuation:false }));   // 固定屏幕大小；遮挡改由朝向判断
-    sp.userData.ll=[c[1],c[0]];
+    sp.userData.ll=[c[1],c[0]]; sp.userData.name=name;
     sp.position.copy(ll2v(c[1], c[0], surfR(c[1],c[0],LABEL_GAP)));
     sp.userData.aspect = tw/(20*s);
     sp.renderOrder=10;
@@ -989,7 +989,13 @@ function flyTo(lat, lon, distOverride){
 }
 /* 当前选点（双击 / 跳转 / 快捷地点 / 微调设定，红点所在位置）；悬停与单击不受它限制 */
 let selected=null;
-function clearSelection(){ selected=null; marker.visible=false; infoEl.classList.remove('on'); highlightGroup.clear(); }
+/* 搜索定位的国家或地区：标注始终显示（小国也显示），并上移到红点上方 */
+let focusName=null;
+function setFocusLabel(name){
+  focusName=name;
+  labelGroup.children.forEach(sp=>sp.center.set(.5, sp.userData.name===name ? -.35 : .5));
+}
+function clearSelection(){ selected=null; marker.visible=false; infoEl.classList.remove('on'); highlightGroup.clear(); setFocusLabel(null); }
 function fmtM(v){ v=Math.round(v); return (v>0?'+':'')+v+' m'; }
 function showElev(el){
   const b=document.getElementById('iElev');
@@ -1167,12 +1173,19 @@ function regionSpan(f){
 function selectSearch(r){
   const inp=document.getElementById('srch');
   inp.value=r.zh; closeSearch(); inp.blur();
-  highlightGroup.clear();
-  if(r.type==='region'){            // 定位范围，不给整个国家或地区一个海拔值
+  highlightGroup.clear(); setFocusLabel(null);
+  if(r.type==='region'){            // 高亮边界，红点放在中心位置（内部离边界最远的点，与标注同一处）
     const c=centroid(r.f.geometry); if(!c) return;
     drawBorders(highlightGroup,[r.f],highlightMat);
-    flyCam(c[1],c[0], R+Math.max(16,Math.min(250,regionSpan(r.f)*2.7)), 1100);
-    toast(`已定位 ${r.zh}，请在地图上选点查询海拔或海深`, 2600);
+    setFocusLabel(r.f.properties.name);
+    const lat=Math.round(c[1]*1e4)/1e4, lon=Math.round(c[0]*1e4)/1e4;
+    document.getElementById('lat').value=lat; document.getElementById('lon').value=lon;
+    flyCam(lat,lon, R+Math.max(16,Math.min(250,regionSpan(r.f)*2.7)), 1100);
+    placeMarker(lat,lon);
+    selected={lat,lon};
+    infoEl.classList.add('on');
+    updateInfo(lat,lon);
+    toast(`已定位 ${r.zh}，红点为其中心位置`, 2600);
   }else{
     lockTo(r.lat,r.lon);            // 地标：选点（结果中地标参考值与格网估算分开显示）
   }
@@ -1527,7 +1540,7 @@ function animate(t){
     const p=sp.position, pl=p.length();
     const facing=(p.x*(cp.x-p.x)+p.y*(cp.y-p.y)+p.z*(cp.z-p.z))/(pl*cp.distanceTo(p));
     const edge=Math.min(1,Math.max(0,(facing-.08)/.17));
-    const size=Math.min(1,Math.max(0,(sp.userData.area/minArea-.6)/.6));
+    const size=sp.userData.name===focusName ? 1 : Math.min(1,Math.max(0,(sp.userData.area/minArea-.6)/.6));
     const o = d>620 ? 0 : edge*size;
     sp.material.opacity=o; sp.visible=o>.01;
   });
